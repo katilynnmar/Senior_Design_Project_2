@@ -7,7 +7,7 @@ Adafruit_LIS3MDL lis3mdl;
 
 void setup() {
   Serial.begin(115200);
-  delay(100);                    // Short delay to stabilize Serial connection
+  delay(100);                   
   while (!Serial) delay(10);     // Wait for Serial Monitor to be ready
 
   Serial.println("Initializing IMU sensors...");
@@ -68,5 +68,5 @@ void loop() {
   Serial.println(" °C");
 
   Serial.println();        
-  delay(1000);                   // Delay to control data output rate
+  delay(1000);              
 }
