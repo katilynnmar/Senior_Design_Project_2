@@ -1,23 +1,78 @@
-﻿
-Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.9.34622.214
-MinimumVisualStudioVersion = 10.0.40219.1
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "Prj2GUI", "Prj2GUI.pyproj", "{BE409976-C9C5-44FE-A726-A4D9D5C2F5BE}"
-EndProject
-Global
-	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|Any CPU = Debug|Any CPU
-		Release|Any CPU = Release|Any CPU
-	EndGlobalSection
-	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{BE409976-C9C5-44FE-A726-A4D9D5C2F5BE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BE409976-C9C5-44FE-A726-A4D9D5C2F5BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {49EC5481-C90C-4056-ACA7-9EE66F449AA7}
-	EndGlobalSection
-EndGlobal
+import PySimpleGUI as sg
+import serial
+
+# Set up the serial connection to the Teensy
+ser = serial.Serial('COM3', 115200)  # Replace 'COM3' with your Teensy's port
+ser.flush()
+
+# Initial IMU data
+PosX, PosY, PosZ = 0, 0, 0
+sats = 0
+AngularVelocity = 0
+Acceleration = 0
+MagneticField = 0
+
+# Define GUI layout
+home = [[sg.Button("Start Display", button_color="green"), sg.Button("End Session", button_color="red")]]
+dataDisplay = [
+    [sg.Button("End Display", button_color="red")],
+    [sg.Text("GPS", justification="center", font=('Arial Bold', 20))],
+    [sg.Text("PosX:", justification="right"), sg.Text(PosX, key='PosX'),
+     sg.Text("PosY:", justification="right"), sg.Text(PosY, key='PosY'),
+     sg.Text("PosZ:", justification="right"), sg.Text(PosZ, key='PosZ')],
+    [sg.Text("Satellites:", justification="left"), sg.Text(sats, key='sats')],
+    [sg.Text("Angular Velocity:", justification="left"), sg.Text(AngularVelocity, key='AngularVelocity')],
+    [sg.Text("Acceleration:", justification="left"), sg.Text(Acceleration, key='Acceleration')],
+    [sg.Text("Magnetic Field:", justification="left"), sg.Text(MagneticField, key='MagneticField')]
+]
+layout = [[sg.Column(home, key='-COL1-'), sg.Column(dataDisplay, visible=False, key='-COL2-')]]
+window = sg.Window("Serial Display GUI", layout, margins=(200, 100))
+layout = 1
+
+# Main event loop
+try:
+    while True:
+        event, values = window.read(timeout=500)
+        if event in (None, 'End Session'):
+            break
+
+        if event == 'Start Display':
+            window[f'-COL{layout}-'].update(visible=False)
+            layout = 2
+            window[f'-COL{layout}-'].update(visible=True)
+
+        if event == 'End Display':
+            window[f'-COL{layout}-'].update(visible=False)
+            layout = 1
+            window[f'-COL{layout}-'].update(visible=True)
+
+        # Read data from the serial connection
+        if ser.in_waiting > 0:
+            line = ser.readline().decode('utf-8').strip()  # Read a line from serial
+            try:
+                # Example data format: "Accel_X=1.2,Accel_Y=2.3,Accel_Z=3.4,AngularVelocity=4.5,MagneticField=6.7"
+                data = dict(item.split('=') for item in line.split(','))
+                
+                # Update values
+                PosX = float(data.get('Accel_X', PosX))
+                PosY = float(data.get('Accel_Y', PosY))
+                PosZ = float(data.get('Accel_Z', PosZ))
+                AngularVelocity = float(data.get('AngularVelocity', AngularVelocity))
+                MagneticField = float(data.get('MagneticField', MagneticField))
+
+                # Update GUI elements
+                window['PosX'].update(PosX)
+                window['PosY'].update(PosY)
+                window['PosZ'].update(PosZ)
+                window['AngularVelocity'].update(AngularVelocity)
+                window['MagneticField'].update(MagneticField)
+
+            except ValueError as e:
+                print(f"Error parsing data: {e}")
+
+except KeyboardInterrupt:
+    print("Program terminated by user.")
+
+finally:
+    window.close()
+    ser.close()
