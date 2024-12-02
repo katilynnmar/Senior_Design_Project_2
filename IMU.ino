@@ -1,72 +1,90 @@
-#include <Adafruit_LSM6DSOX.h>   // Library for LSM6DSOX IMU
-#include <Adafruit_LIS3MDL.h>     // Library for LIS3MDL magnetometer
+#include <Adafruit_LSM6DSOX.h>    // Library for IMU
+#include <Adafruit_LIS3MDL.h>     // Library for magnetometer
+#include <SD.h>                   // Library for SD card
+#include <SoftwareSerial.h>
 
-// Create objects for the IMU sensors
+#define HC06_RX 34              // Teensy Pin RX2
+#define HC06_TX 35              // Teensy Pin TX2
+#define SD_CS_PIN BUILTIN_SDCARD // Pin for the built-in SD card reader on Teensy
+
+// Objects for IMU and SD card logging
 Adafruit_LSM6DSOX lsm6dsox;
 Adafruit_LIS3MDL lis3mdl;
+File dataFile;
+SoftwareSerial hc06(HC06_RX, HC06_TX);
 
 void setup() {
-  Serial.begin(115200);
-  delay(100);                   
-  while (!Serial) delay(10);     // Wait for Serial Monitor to be ready
+  // Initialize Serial Monitors and Bluetooth
+  Serial.begin(9600);
+  hc06.begin(9600);    // Bluetooth Serial
+  
+  Serial.println("System initializing...");
+  hc06.println("Bluetooth communication active.");
+  
+  // Wait for Serial Monitor
+  while (!Serial) delay(10);
 
-  Serial.println("Initializing IMU sensors...");
-
-  // Initialize the LSM6DSOX (accelerometer and gyroscope)
+  // Initialize IMU sensors
   if (!lsm6dsox.begin_I2C()) {
-    Serial.println("Failed to initialize LSM6DSOX sensor!");
-    while (1) delay(10);         // Stop if initialization fails
-  } else {
-    Serial.println("LSM6DSOX initialized successfully.");
+    Serial.println("Failed to initialize LSM6DSOX!");
+    while (1);
   }
-
-  // Initialize the LIS3MDL (magnetometer)
   if (!lis3mdl.begin_I2C()) {
-    Serial.println("Failed to initialize LIS3MDL sensor!");
-    while (1) delay(10);         // Stop if initialization fails
-  } else {
-    Serial.println("LIS3MDL initialized successfully.");
+    Serial.println("Failed to initialize LIS3MDL!");
+    while (1);
   }
+  Serial.println("IMU sensors initialized successfully.");
 
-  Serial.println("LSM6DSOX and LIS3MDL initialized successfully!\n");
+  // Initialize SD card
+  if (!SD.begin(SD_CS_PIN)) {
+    Serial.println("Failed to initialize SD card!");
+    while (1); // Stop if the SD card doesn't initialize
+  }
+  
+  dataFile = SD.open("imulog.csv", FILE_WRITE); // Open the CSV file
+  if (dataFile) {
+    dataFile.println("Accel_X,Accel_Y,Accel_Z,Gyro_X,Gyro_Y,Gyro_Z,Mag_X,Mag_Y,Mag_Z,Temperature");
+    dataFile.flush();
+    Serial.println("SD card initialized. IMU data logging started.");
+  } else {
+    Serial.println("Error opening imulog.csv!");
+    while (1);
+  }
 }
 
 void loop() {
+  // Process IMU data
   sensors_event_t accel, gyro, mag, temp;
-
-  // Retrieve sensor events for accelerometer, gyroscope, and temperature
   lsm6dsox.getEvent(&accel, &gyro, &temp);
-  lis3mdl.getEvent(&mag);        // Get magnetometer data
+  lis3mdl.getEvent(&mag);
 
-  // Display Acceleration Data (in m/s^2)
-  Serial.print("Acceleration (m/s^2) -> X: ");
-  Serial.print(accel.acceleration.x, 4);
-  Serial.print(", Y: ");
-  Serial.print(accel.acceleration.y, 4);
-  Serial.print(", Z: ");
-  Serial.println(accel.acceleration.z, 4);
+  // Format IMU data
+  String imuData = String(accel.acceleration.x, 4) + "," +
+                   String(accel.acceleration.y, 4) + "," +
+                   String(accel.acceleration.z, 4) + "," +
+                   String(gyro.gyro.x, 4) + "," +
+                   String(gyro.gyro.y, 4) + "," +
+                   String(gyro.gyro.z, 4) + "," +
+                   String(mag.magnetic.x, 4) + "," +
+                   String(mag.magnetic.y, 4) + "," +
+                   String(mag.magnetic.z, 4) + "," +
+                   String(temp.temperature, 2);
 
-  // Display Angular Velocity (Gyroscope data in rad/s)
-  Serial.print("Angular Velocity (rad/s) -> X: ");
-  Serial.print(gyro.gyro.x, 4);
-  Serial.print(", Y: ");
-  Serial.print(gyro.gyro.y, 4);
-  Serial.print(", Z: ");
-  Serial.println(gyro.gyro.z, 4);
+  // Log IMU data to SD card, Serial Monitor, and Bluetooth
+  if (dataFile) {
+    dataFile.println(imuData);
+    dataFile.flush(); // Ensure immediate write to the SD card
+  } else {
+    Serial.println("Error writing to imulog.csv!");
+  }
+  Serial.println(imuData);
+  hc06.println(imuData);
 
-  // Display Magnetic Field Data (μT)
-  Serial.print("Magnetic Field (μT) -> X: ");
-  Serial.print(mag.magnetic.x, 4);
-  Serial.print(", Y: ");
-  Serial.print(mag.magnetic.y, 4);
-  Serial.print(", Z: ");
-  Serial.println(mag.magnetic.z, 4);
+  delay(1000); // Adjust delay as needed
+}
 
-  // Optional: Display Temperature (in degrees Celsius)
-  Serial.print("Temperature: ");
-  Serial.print(temp.temperature);
-  Serial.println(" °C");
-
-  Serial.println();        
-  delay(1000);              
+void closeFile() {
+  if (dataFile) {
+    dataFile.close(); // Close file to ensure data integrity
+  }
 }
