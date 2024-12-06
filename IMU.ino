@@ -3,23 +3,23 @@
 #include <SD.h>                   // Library for SD card
 #include <SoftwareSerial.h>
 
-#define HC06_RX 34              // Teensy Pin RX2
-#define HC06_TX 35              // Teensy Pin TX2
+
 #define SD_CS_PIN BUILTIN_SDCARD // Pin for the built-in SD card reader on Teensy
 
 // Objects for IMU and SD card logging
 Adafruit_LSM6DSOX lsm6dsox;
 Adafruit_LIS3MDL lis3mdl;
 File dataFile;
-SoftwareSerial hc06(HC06_RX, HC06_TX);
+
 
 void setup() {
   // Initialize Serial Monitors and Bluetooth
   Serial.begin(9600);
-  hc06.begin(9600);    // Bluetooth Serial
+  Serial1.begin(9600);      // HC-06 default baud rate is 9600
+
   
   Serial.println("System initializing...");
-  hc06.println("Bluetooth communication active.");
+  Serial1.println("Bluetooth communication active.");
   
   // Wait for Serial Monitor
   while (!Serial) delay(10);
@@ -78,7 +78,7 @@ void loop() {
     Serial.println("Error writing to imulog.csv!");
   }
   Serial.println(imuData);
-  hc06.println(imuData);
+  Serial1.println(imuData);
 
   delay(1000); // Adjust delay as needed
 }
