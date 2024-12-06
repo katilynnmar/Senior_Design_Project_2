@@ -2,28 +2,43 @@ import PySimpleGUI as sg
 import serial
 
 # Set up the serial connection to the Teensy
-ser = serial.Serial('COM3', 115200)  # Replace 'COM3' with your Teensy's port
+ser = serial.Serial('COM3', 115200, timeout=1)  # Replace 'COM3' with your Teensy's port
 ser.flush()
 
-# Initial IMU data
-PosX, PosY, PosZ = 0, 0, 0
+# Initial data
 sats = 0
-AngularVelocity = 0
-Acceleration = 0
-MagneticField = 0
+latitude = 0.0
+longitude = 0.0
+speed = 0.0
+altitude = 0.0
+acceleration = [0.0, 0.0, 0.0]  # X, Y, Z
+angular_velocity = [0.0, 0.0, 0.0]  # X, Y, Z
+magnetic_field = [0.0, 0.0, 0.0]  # X, Y, Z
+temperature = 0.0
 
 # Define GUI layout
 home = [[sg.Button("Start Display", button_color="green"), sg.Button("End Session", button_color="red")]]
 dataDisplay = [
     [sg.Button("End Display", button_color="red")],
-    [sg.Text("GPS", justification="center", font=('Arial Bold', 20))],
-    [sg.Text("PosX:", justification="right"), sg.Text(PosX, key='PosX'),
-     sg.Text("PosY:", justification="right"), sg.Text(PosY, key='PosY'),
-     sg.Text("PosZ:", justification="right"), sg.Text(PosZ, key='PosZ')],
+    [sg.Text("GPS Data", justification="center", font=('Arial Bold', 20))],
     [sg.Text("Satellites:", justification="left"), sg.Text(sats, key='sats')],
-    [sg.Text("Angular Velocity:", justification="left"), sg.Text(AngularVelocity, key='AngularVelocity')],
-    [sg.Text("Acceleration:", justification="left"), sg.Text(Acceleration, key='Acceleration')],
-    [sg.Text("Magnetic Field:", justification="left"), sg.Text(MagneticField, key='MagneticField')]
+    [sg.Text("Latitude:", justification="left"), sg.Text(latitude, key='latitude')],
+    [sg.Text("Longitude:", justification="left"), sg.Text(longitude, key='longitude')],
+    [sg.Text("Speed (MPH):", justification="left"), sg.Text(speed, key='speed')],
+    [sg.Text("Altitude (Feet):", justification="left"), sg.Text(altitude, key='altitude')],
+    [sg.Text("Acceleration (m/s²):", justification="center", font=('Arial Bold', 20))],
+    [sg.Text("X:", justification="left"), sg.Text(acceleration[0], key='accel_x')],
+    [sg.Text("Y:", justification="left"), sg.Text(acceleration[1], key='accel_y')],
+    [sg.Text("Z:", justification="left"), sg.Text(acceleration[2], key='accel_z')],
+    [sg.Text("Angular Velocity (rad/s):", justification="center", font=('Arial Bold', 20))],
+    [sg.Text("X:", justification="left"), sg.Text(angular_velocity[0], key='ang_vel_x')],
+    [sg.Text("Y:", justification="left"), sg.Text(angular_velocity[1], key='ang_vel_y')],
+    [sg.Text("Z:", justification="left"), sg.Text(angular_velocity[2], key='ang_vel_z')],
+    [sg.Text("Magnetic Field (µT):", justification="center", font=('Arial Bold', 20))],
+    [sg.Text("X:", justification="left"), sg.Text(magnetic_field[0], key='mag_x')],
+    [sg.Text("Y:", justification="left"), sg.Text(magnetic_field[1], key='mag_y')],
+    [sg.Text("Z:", justification="left"), sg.Text(magnetic_field[2], key='mag_z')],
+    [sg.Text("Temperature (°C):", justification="left"), sg.Text(temperature, key='temperature')]
 ]
 layout = [[sg.Column(home, key='-COL1-'), sg.Column(dataDisplay, visible=False, key='-COL2-')]]
 window = sg.Window("Serial Display GUI", layout, margins=(200, 100))
@@ -49,26 +64,45 @@ try:
         # Read data from the serial connection
         if ser.in_waiting > 0:
             line = ser.readline().decode('utf-8').strip()  # Read a line from serial
-            try:
-                # Example data format: "Accel_X=1.2,Accel_Y=2.3,Accel_Z=3.4,AngularVelocity=4.5,MagneticField=6.7"
-                data = dict(item.split('=') for item in line.split(','))
-                
-                # Update values
-                PosX = float(data.get('Accel_X', PosX))
-                PosY = float(data.get('Accel_Y', PosY))
-                PosZ = float(data.get('Accel_Z', PosZ))
-                AngularVelocity = float(data.get('AngularVelocity', AngularVelocity))
-                MagneticField = float(data.get('MagneticField', MagneticField))
+            if line:  # Check if the line is not empty
+                try:
+                    # Split GPS/IMU data and handle incomplete segments
+                    gps_data, imu_data = line.split("/")
+                    gps_values = gps_data.split(",")
+                    imu_values = imu_data.split(",")
 
-                # Update GUI elements
-                window['PosX'].update(PosX)
-                window['PosY'].update(PosY)
-                window['PosZ'].update(PosZ)
-                window['AngularVelocity'].update(AngularVelocity)
-                window['MagneticField'].update(MagneticField)
+                    # Parse GPS values
+                    sats = int(gps_values[0]) if len(gps_values) > 0 and gps_values[0].isdigit() else sats
+                    latitude = float(gps_values[1]) if len(gps_values) > 1 else latitude
+                    longitude = float(gps_values[2]) if len(gps_values) > 2 else longitude
+                    speed = float(gps_values[3]) if len(gps_values) > 3 else speed
+                    altitude = float(gps_values[4]) if len(gps_values) > 4 else altitude
 
-            except ValueError as e:
-                print(f"Error parsing data: {e}")
+                    # Parse IMU values
+                    acceleration = [float(imu_values[i]) for i in range(3)] if len(imu_values) > 2 else acceleration
+                    angular_velocity = [float(imu_values[i]) for i in range(3, 6)] if len(imu_values) > 5 else angular_velocity
+                    magnetic_field = [float(imu_values[i]) for i in range(6, 9)] if len(imu_values) > 8 else magnetic_field
+                    temperature = float(imu_values[9]) if len(imu_values) > 9 else temperature
+
+                    # Update GUI elements
+                    window['sats'].update(sats)
+                    window['latitude'].update(f"{latitude:.6f}")
+                    window['longitude'].update(f"{longitude:.6f}")
+                    window['speed'].update(f"{speed:.2f}")
+                    window['altitude'].update(f"{altitude:.2f}")
+                    window['accel_x'].update(f"{acceleration[0]:.2f}")
+                    window['accel_y'].update(f"{acceleration[1]:.2f}")
+                    window['accel_z'].update(f"{acceleration[2]:.2f}")
+                    window['ang_vel_x'].update(f"{angular_velocity[0]:.2f}")
+                    window['ang_vel_y'].update(f"{angular_velocity[1]:.2f}")
+                    window['ang_vel_z'].update(f"{angular_velocity[2]:.2f}")
+                    window['mag_x'].update(f"{magnetic_field[0]:.2f}")
+                    window['mag_y'].update(f"{magnetic_field[1]:.2f}")
+                    window['mag_z'].update(f"{magnetic_field[2]:.2f}")
+                    window['temperature'].update(f"{temperature:.2f}")
+
+                except (ValueError, IndexError) as e:
+                    print(f"Error parsing data: {e}. Received line: {line}")
 
 except KeyboardInterrupt:
     print("Program terminated by user.")
