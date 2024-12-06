@@ -51,18 +51,17 @@ void setup()
   Serial.println("IMU sensors initialized successfully.");
 
   // Open CSV file for data logging on the SD card
-  dataFile = SD.open("gpslog.csv", FILE_WRITE);
+  dataFile = SD.open("combolog.csv", FILE_WRITE); // Open the CSV file
   if (dataFile) {
-    // Write column headers to the CSV file
-    dataFile.print("Satellite_Count,Latitude,Longitude,Speed_MPH,Altitude_Feet,");
-    dataFile.println("Accel_X,Accel_Y,Accel_Z,Gyro_X,Gyro_Y,Gyro_Z,Mag_X,Mag_Y,Mag_Z,Temperature");
-    dataFile.flush(); // Ensure headers are written immediately
+    // Write CSV header
+    dataFile.println("Satellite_Count,Latitude,Longitude,Altitude_Feet,Accel_X,Accel_Y,Accel_Z,Gyro_X,Gyro_Y,Gyro_Z,Mag_X,Mag_Y,Mag_Z,Temperature");
+    dataFile.flush();
     Serial.println("SD card initialized. GPS and IMU data logging started.");
     hc06.println("SD card initialized. GPS and IMU data logging started.");
   } else {
-    Serial.println("Error opening gpslog.csv!");
-    hc06.println("Error opening gpslog.csv!");
-    while (1); // Halt execution if file opening fails
+    Serial.println("Error opening gpsimu_log.csv!");
+    hc06.println("Error opening gpsimu_log.csv!");
+    while (1);
   }
 }
 
@@ -97,14 +96,16 @@ void loop()
                        String(mag.magnetic.z, 4) + "," +
                        String(temp.temperature, 1);
 
+      String comboData = gpsData + "/" + imuData;
+
       // Write GPS and IMU data to the SD card
       if (dataFile) {
-        dataFile.println(gpsData); // Log GPS data
-        dataFile.println(imuData); // Log IMU data
+        dataFile.println(comboData); // Log GPS and IMU data
         dataFile.flush();          // Ensure data is written to the file
+        Serial.println("SD Card Written");
       } else {
-        Serial.println("Error writing to gpslog.csv!"); // SD write error
-        hc06.println("Error writing to gpslog.csv!");
+        Serial.println("Error writing to combolog.csv!"); // SD write error
+        hc06.println("Error writing to combolog.csv!");
       }
 
       // Print GPS and IMU data to the Serial Monitor
@@ -114,8 +115,7 @@ void loop()
       Serial.println(imuData);
 
       // Send GPS and IMU data to Bluetooth
-      hc06.println(gpsData);
-      hc06.println(imuData);
+      hc06.println(comboData);
 
       // Handle case when no more GPS data is available
       if (!Serial7.available()) {
