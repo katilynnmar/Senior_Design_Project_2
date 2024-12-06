@@ -4,9 +4,6 @@
 #include <Adafruit_LSM6DSOX.h>   // Library for LSM6DSOX IMU
 #include <Adafruit_LIS3MDL.h>    // Library for LIS3MDL magnetometer
 
-// Define pin connections
-#define HC06_RX 34              // Teensy Pin RX2 for HC-06 Bluetooth module
-#define HC06_TX 35              // Teensy Pin TX2 for HC-06 Bluetooth module
 #define SD_CS_PIN BUILTIN_SDCARD // Pin for the built-in SD card reader on Teensy
 
 // Declare sensor and communication objects
@@ -14,18 +11,17 @@ Adafruit_LSM6DSOX lsm6dsox;       // IMU object for LSM6DSOX
 Adafruit_LIS3MDL lis3mdl;         // Magnetometer object for LIS3MDL
 TinyGPSPlus gps;                  // GPS object to handle NMEA data
 File dataFile;                    // File object for SD card logging
-SoftwareSerial hc06(HC06_RX, HC06_TX); // SoftwareSerial for HC-06 Bluetooth module
 
 void setup()
 {
   Serial.begin(9600);          // Initialize Serial Monitor for debugging
   Serial7.begin(9600);         // Initialize GPS Serial (GPS TX -> Teensy RX1)
-  hc06.begin(115200);          // Initialize HC-06 Bluetooth Serial
+  Serial1.begin(115200);          // Initialize HC-06 Bluetooth Serial
   Serial.println("GPS Start"); // Indicate the system has started
 
   // Display system initialization message
   Serial.println("System initializing...");
-  hc06.println("Bluetooth communication active.");
+  Serial1.println("Bluetooth communication active.");
 
   // Wait for Serial Monitor connection
   while (!Serial) delay(10);
@@ -33,7 +29,7 @@ void setup()
   // Initialize SD card
   if (!SD.begin(SD_CS_PIN)) {
     Serial.println("Failed to initialize SD card!");
-    hc06.println("Failed to initialize SD card!");
+    Serial1.println("Failed to initialize SD card!");
     while (1); // Halt execution if SD card initialization fails
   }
 
@@ -57,10 +53,10 @@ void setup()
     dataFile.println("Satellite_Count,Latitude,Longitude,Altitude_Feet,Accel_X,Accel_Y,Accel_Z,Gyro_X,Gyro_Y,Gyro_Z,Mag_X,Mag_Y,Mag_Z,Temperature");
     dataFile.flush();
     Serial.println("SD card initialized. GPS and IMU data logging started.");
-    hc06.println("SD card initialized. GPS and IMU data logging started.");
+    Serial1.println("SD card initialized. GPS and IMU data logging started.");
   } else {
     Serial.println("Error opening gpsimu_log.csv!");
-    hc06.println("Error opening gpsimu_log.csv!");
+    Serial1.println("Error opening gpsimu_log.csv!");
     while (1);
   }
 }
@@ -102,25 +98,22 @@ void loop()
       if (dataFile) {
         dataFile.println(comboData); // Log GPS and IMU data
         dataFile.flush();          // Ensure data is written to the file
-        Serial.println("SD Card Written");
       } else {
         Serial.println("Error writing to combolog.csv!"); // SD write error
-        hc06.println("Error writing to combolog.csv!");
+        Serial1.println("Error writing to combolog.csv!");
       }
 
-      // Print GPS and IMU data to the Serial Monitor
-      Serial.print("GPS, ");
-      Serial.println(gpsData);
-      Serial.print("IMU, ");
-      Serial.println(imuData);
+
+      Serial.println(comboData);
+
 
       // Send GPS and IMU data to Bluetooth
-      hc06.println(comboData);
+      Serial1.println(comboData);
 
       // Handle case when no more GPS data is available
       if (!Serial7.available()) {
         Serial.println("No GPS data available. Waiting for signal...");
-        hc06.println("No GPS data available. Waiting for signal...");
+        Serial1.println("No GPS data available. Waiting for signal...");
       }
 
       Serial.println(); // Add a blank line for readability
